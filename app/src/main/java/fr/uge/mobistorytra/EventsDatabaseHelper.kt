@@ -49,4 +49,60 @@ class EventsDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABAS
         private const val COLUMN_ITEM_DESCRITPION = "Itemdescription"
         private const val COLUMN_ITEM_WIKI = "Itemwikipedia"
     }
+
+    override fun onCreate(db: SQLiteDatabase) {
+        val createEventsTableStatement = """
+        CREATE TABLE $TABLE_EVENTS (
+            $COLUMN_ID INTEGER PRIMARY KEY,
+            $COLUMN_LABEL TEXT,
+            $COLUMN_ALIASES TEXT,
+            $COLUMN_DESCRIPTION TEXT,
+            $COLUMN_WIKIPEDIA TEXT,
+            $COLUMN_POPU_FR INTEGER,
+            $COLUMN_POPU_EN INTEGER,
+            $COLUMN_FAVORITE INTEGER,
+            $COLUMN_ETIQUETTE TEXT
+
+        )
+        """.trimIndent()
+
+        val createClaimsTableStatement = """
+        CREATE TABLE $TABLE_CLAIMS (
+            $COLUMN_CLAIMS_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+            $COLUMN_CLAIMS_EVENTID INTEGER,
+            $COLUMN_CLAIMS_VERBOSE TEXT,
+            $COLUMN_CLAIMS_VALUE TEXT,
+            $COLUMN_ITEM_LABEL TEXT,
+            $COLUMN_ITEM_DESCRITPION TEXT,
+            $COLUMN_ITEM_WIKI TEXT,
+            FOREIGN KEY ($COLUMN_CLAIMS_EVENTID) REFERENCES $TABLE_EVENTS($COLUMN_ID)
+        )
+        """.trimIndent()
+
+        val createDateTableStatement = """
+        CREATE TABLE $TABLE_DATE (
+            $COLUMN_DATE_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+            $COLUMN_DATE_EVENTID INTEGER,
+            $COLUMN_YEAR INTEGER,
+            $COLUMN_MONTH INTEGER,
+            $COLUMN_DAY INTEGER,
+            FOREIGN KEY ($COLUMN_DATE_EVENTID) REFERENCES $TABLE_EVENTS($COLUMN_ID)
+        )
+        """.trimIndent()
+
+        val createGeoTableStatement = """
+        CREATE TABLE $TABLE_GEO (
+            $COLUMN_GEO_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+            $COLUMN_GEO_EVENTID INTEGER,
+            $COLUMN_LATITUDE DOUBLE,
+            $COLUMN_LONGITUDE DOUBLE,
+            FOREIGN KEY ($COLUMN_GEO_EVENTID) REFERENCES $TABLE_EVENTS($COLUMN_ID)
+        )
+        """.trimIndent()
+
+        db.execSQL(createGeoTableStatement)
+        db.execSQL(createEventsTableStatement)
+        db.execSQL(createClaimsTableStatement)
+        db.execSQL(createDateTableStatement)
+    }
 }
