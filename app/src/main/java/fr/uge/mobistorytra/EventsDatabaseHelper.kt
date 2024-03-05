@@ -105,4 +105,34 @@ class EventsDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABAS
         db.execSQL(createClaimsTableStatement)
         db.execSQL(createDateTableStatement)
     }
+
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        db.execSQL("DROP TABLE IF EXISTS $TABLE_EVENTS");
+        db.execSQL("DROP TABLE IF EXISTS $TABLE_CLAIMS");
+        db.execSQL("DROP TABLE IF EXISTS $TABLE_DATE");
+        db.execSQL("DROP TABLE IF EXISTS $TABLE_GEO");
+        onCreate(db);
+    }
+
+    fun deleteAllItems() {
+        val db = this.writableDatabase
+        db.delete(TABLE_EVENTS, null, null)
+        db.close()
+    }
+
+    fun hasEventsData(): Boolean {
+        val db = this.readableDatabase
+        var hasData = false
+
+        val query = "SELECT COUNT(*) FROM $TABLE_EVENTS"
+
+        db.rawQuery(query, null).use { cursor ->
+            if (cursor.moveToFirst()) {
+                hasData = cursor.getInt(0) > 0
+            }
+        }
+
+        db.close()
+        return hasData
+    }
 }
