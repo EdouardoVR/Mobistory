@@ -135,4 +135,102 @@ class EventsDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABAS
         db.close()
         return hasData
     }
+
+    fun insertItem(event: Event) {
+        val db = this.writableDatabase
+
+        val cursor = db.query(
+            TABLE_EVENTS,
+            arrayOf(COLUMN_ID),
+            "$COLUMN_ID = ?",
+            arrayOf(event.id.toString()),
+            null, null, null
+        )
+
+        val exists = cursor.count > 0
+        cursor.close()
+
+        if (!exists) {
+            val eventValues = ContentValues().apply {
+                put(COLUMN_ID, event.id)
+                put(COLUMN_LABEL, event.label)
+                put(COLUMN_ALIASES, event.aliases)
+                put(COLUMN_DESCRIPTION, event.description)
+                put(COLUMN_WIKIPEDIA, event.wikipedia)
+                put(COLUMN_POPU_FR, event.popularity.fr)
+                put(COLUMN_POPU_EN, event.popularity.en)
+                put(COLUMN_FAVORITE, event.isFavorite)
+                put(COLUMN_ETIQUETTE, event.etiquette)
+            }
+            db.insert(TABLE_EVENTS, null, eventValues)
+        }
+
+        event.claims.forEach { claim ->
+
+            val cursorClaim = db.query(
+                TABLE_CLAIMS,
+                arrayOf(COLUMN_CLAIMS_ID),
+                "$COLUMN_CLAIMS_ID = ?",
+                arrayOf(claim.id.toString()),
+                null, null, null
+            )
+
+            val claimExists = cursorClaim.count > 0
+            cursorClaim.close()
+
+            if (!claimExists) {
+                val claimValues = ContentValues().apply {
+                    put(COLUMN_CLAIMS_EVENTID, event.id)
+                    put(COLUMN_CLAIMS_VERBOSE, claim.verboseName)
+                    put(COLUMN_CLAIMS_VALUE, claim.value)
+                    put(COLUMN_ITEM_LABEL, claim.item?.label ?: "")
+                    put(COLUMN_ITEM_DESCRITPION, claim.item?.description ?: "")
+                    put(COLUMN_ITEM_WIKI, claim.item?.wikipedia ?: "")
+                }
+                db.insert(TABLE_CLAIMS, null, claimValues)
+            }
+        }
+
+        val cursordate = db.query(
+            TABLE_DATE,
+            arrayOf(COLUMN_DATE_ID),
+            "$COLUMN_DATE_ID = ?",
+            arrayOf(event.date?.id.toString()),
+            null, null, null
+        )
+
+        val dateExists = cursordate.count > 0
+        cursordate.close()
+
+        if (!dateExists) {
+            val eventValues = ContentValues().apply {
+                put(COLUMN_DATE_EVENTID, event.id)
+                put(COLUMN_YEAR, 0)
+                put(COLUMN_MONTH, 1)
+                put(COLUMN_DAY,1)
+            }
+            db.insert(TABLE_DATE, null, eventValues)
+        }
+
+        val cursorGeo = db.query(
+            TABLE_GEO,
+            arrayOf(COLUMN_GEO_ID),
+            "$COLUMN_GEO_ID = ?",
+            arrayOf(event.geo?.id.toString()),
+            null, null, null
+        )
+
+        val geoExiste = cursorGeo.count > 0
+        cursorGeo.close()
+
+        if (!geoExiste) {
+            val eventValues = ContentValues().apply {
+                put(COLUMN_GEO_EVENTID, event.id)
+                put(COLUMN_LATITUDE, 0)
+                put(COLUMN_LONGITUDE, 0)
+            }
+            db.insert(TABLE_GEO, null, eventValues)
+        }
+        db.close()
+    }
 }
