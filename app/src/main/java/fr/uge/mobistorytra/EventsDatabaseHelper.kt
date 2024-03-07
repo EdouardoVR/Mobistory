@@ -233,4 +233,79 @@ class EventsDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABAS
         }
         db.close()
     }
+
+    fun getAllItems(): List<Event> {
+        val events = mutableListOf<Event>()
+        val db = this.readableDatabase
+
+        // Récupérer tous les événements
+        val eventsCursor = db.rawQuery("SELECT * FROM events", null)
+
+        while (eventsCursor.moveToNext()) {
+            val id = eventsCursor.getInt(eventsCursor.getColumnIndexOrThrow("id"))
+            val label = eventsCursor.getString(eventsCursor.getColumnIndexOrThrow("label"))
+            val aliases = eventsCursor.getString(eventsCursor.getColumnIndexOrThrow("aliases"))
+            val description = eventsCursor.getString(eventsCursor.getColumnIndexOrThrow("description"))
+            val wikipedia = eventsCursor.getString(eventsCursor.getColumnIndexOrThrow("wikipedia"))
+            val popularityEn = eventsCursor.getInt(eventsCursor.getColumnIndexOrThrow("popularity_en"))
+            val popularityFr = eventsCursor.getInt(eventsCursor.getColumnIndexOrThrow("popularity_fr"))
+            val favorite = eventsCursor.getInt(eventsCursor.getColumnIndexOrThrow(COLUMN_FAVORITE))
+            val etiquette = eventsCursor.getString(eventsCursor.getColumnIndexOrThrow(COLUMN_ETIQUETTE))
+
+
+            val popularity = Popularity(en = popularityEn, fr = popularityFr)
+
+            val claims = mutableListOf<Claim>()
+            val claimsCursor = db.rawQuery("SELECT * FROM claims WHERE events_id = ?", arrayOf(id.toString()))
+
+            while (claimsCursor.moveToNext()) {
+                val claimId = claimsCursor.getInt(claimsCursor.getColumnIndexOrThrow("id"))
+                val verboseName = claimsCursor.getString(claimsCursor.getColumnIndexOrThrow("verboseName"))
+                val value = claimsCursor.getString(claimsCursor.getColumnIndexOrThrow("value"))
+                val itemLabel = claimsCursor.getString(claimsCursor.getColumnIndexOrThrow("Itemlabel"))
+                val itemDescription = claimsCursor.getString(claimsCursor.getColumnIndexOrThrow("Itemdescription"))
+                val itemWikipedia = claimsCursor.getString(claimsCursor.getColumnIndexOrThrow("Itemwikipedia"))
+                val item = if (itemLabel != null && itemDescription != null && itemWikipedia != null) {
+                    Item(label = itemLabel, description = itemDescription, wikipedia = itemWikipedia)
+                } else {
+                    null
+                }
+
+                claims.add(Claim(id = claimId ,verboseName = verboseName, value = value, item = item))
+            }
+            claimsCursor.close()
+
+            var date: Date? = null
+            val dateCursor = db.rawQuery("SELECT * FROM date WHERE date_id = ?", arrayOf(id.toString()))
+
+            while (dateCursor.moveToNext()) {
+                val dateId = dateCursor.getInt(dateCursor.getColumnIndexOrThrow(COLUMN_DATE_ID))
+                val year = dateCursor.getInt(dateCursor.getColumnIndexOrThrow(COLUMN_YEAR))
+                val month = dateCursor.getInt(dateCursor.getColumnIndexOrThrow(COLUMN_MONTH))
+                val day = dateCursor.getInt(dateCursor.getColumnIndexOrThrow(COLUMN_DAY))
+
+                date = Date(dateId, year, month, day)
+            }
+
+            dateCursor.close()
+
+            var geo: Geo? = null
+            val geoCursor = db.rawQuery("SELECT * FROM geo WHERE geo_id = ?", arrayOf(id.toString()))
+
+            while (geoCursor.moveToNext()) {
+                val geoId = geoCursor.getInt(geoCursor.getColumnIndexOrThrow(COLUMN_GEO_ID))
+                val latitude = geoCursor.getDouble(geoCursor.getColumnIndexOrThrow(COLUMN_LATITUDE))
+                val longitude = geoCursor.getDouble(geoCursor.getColumnIndexOrThrow(COLUMN_LONGITUDE))
+
+                geo = Geo(geoId, latitude, longitude)
+            }
+
+            geoCursor.close()
+            events.add(Event(id = id, label = label, aliases = aliases, description = description, wikipedia = wikipedia, popularity = popularity, claims = claims, date, geo ,favorite, etiquette))
+        }
+
+        eventsCursor.close()
+        db.close()
+        return events
+    }
 }
