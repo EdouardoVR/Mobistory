@@ -308,4 +308,81 @@ class EventsDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABAS
         db.close()
         return events
     }
+
+    fun hasGeoData(): Boolean {
+        val db = this.readableDatabase
+        var hasData = false
+
+        val query = "SELECT EXISTS (SELECT 1 FROM $TABLE_GEO WHERE $COLUMN_LATITUDE IS NOT NULL AND $COLUMN_LONGITUDE IS NOT NULL LIMIT 1)"
+
+        db.rawQuery(query, null).use { cursor ->
+            if (cursor.moveToFirst()) {
+                hasData = cursor.getInt(0) == 1
+            }
+        }
+        db.close()
+        return hasData
+    }
+
+    fun hasValidDateData(): Boolean {
+        val db = this.readableDatabase
+        var hasData = false
+
+        // Requête pour vérifier l'existence de lignes avec des valeurs différentes de 0 pour year, month, et day
+        val query = """
+        SELECT EXISTS (
+            SELECT 1 
+            FROM $TABLE_DATE 
+            WHERE $COLUMN_YEAR != 0 OR $COLUMN_MONTH != 1 OR $COLUMN_DAY != 1 
+            LIMIT 1
+        )
+    """.trimIndent()
+
+        db.rawQuery(query, null).use { cursor ->
+            if (cursor.moveToFirst()) {
+                // Si le résultat est 1, cela signifie qu'il existe au moins une ligne avec des valeurs valides (différentes de 0)
+                hasData = cursor.getInt(0) == 1
+            }
+        }
+
+        db.close()
+        return hasData
+    }
+
+    fun addGeoAllEvent(eventGeoMap: Map<Int, Geo>) {
+        val db = this.writableDatabase
+        db.beginTransaction()
+        try {
+            eventGeoMap.forEach { (eventId, geo) ->
+                // Vérifiez si l'entrée existe déjà
+                val cursor = db.query(
+                    TABLE_GEO,
+                    arrayOf(COLUMN_DATE_EVENTID),
+                    "$COLUMN_GEO_EVENTID = ?",
+                    arrayOf(eventId.toString()),
+                    null,
+                    null,
+                    null
+                )
+                val exists = cursor.moveToFirst()
+                cursor.close()
+
+                val geoValues = ContentValues().apply {
+                    put(COLUMN_GEO_EVENTID, eventId)
+                    put(COLUMN_LATITUDE, geo.latitude)
+                    put(COLUMN_LONGITUDE, geo.longitude)
+                }
+
+                if (exists) {
+                    db.update(TABLE_GEO, geoValues, "$COLUMN_GEO_EVENTID = ?", arrayOf(eventId.toString()))
+                } else {
+                    db.insert(TABLE_GEO, null, geoValues)
+                }
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        db.close()
+    }
 }
