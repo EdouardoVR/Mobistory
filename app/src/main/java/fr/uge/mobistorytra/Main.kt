@@ -23,4 +23,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
     }
 
+    enum class DisplayMode {
+        Alphabetical,
+        Temporal,
+        Populaire,
+        Geo,
+    }
+
 }
