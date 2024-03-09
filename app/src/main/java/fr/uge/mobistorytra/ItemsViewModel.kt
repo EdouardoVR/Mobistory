@@ -30,6 +30,39 @@ class ItemsViewModel(private val dbHelper: EventsDatabaseHelper) : ViewModel() {
         }
     }
 
+    fun searchEvents(query: String) {
+        val filteredEvents = if (query.isEmpty()) {
+            itemList
+        } else {
+            itemList.filter {
+                it.label.contains(query, ignoreCase = true)
+            }
+        }
+        _items.postValue(filteredEvents)
+    }
+
+    fun toggleFavorite(eventId: Int) {
+        _items.value = _items.value?.map { event ->
+            if (event.id == eventId) {
+                event.copy(isFavorite = if (event.isFavorite == 0) 1 else 0)
+            } else {
+                event
+            }
+        }
+        dbHelper.toggleFavorite(eventId)
+    }
+
+    fun toggleEtiquette(eventId: Int, text: String) {
+        _items.value = _items.value?.map { event ->
+            if (event.id == eventId) {
+                event.copy(etiquette = text)
+            } else {
+                event
+            }
+        }
+        dbHelper.toggleEtiquette(eventId, text)
+    }
+
     private fun extractEventDates() {
         if (!dbHelper.hasValidDateData()) {
             val eventDateMap = mutableMapOf<Int, Date>()
@@ -83,5 +116,16 @@ class ItemsViewModel(private val dbHelper: EventsDatabaseHelper) : ViewModel() {
         }
 
         return yearString?.toIntOrNull()
+    }
+
+    private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val earthRadius = 6371 // Approx Earth radius in KM
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLon = Math.toRadians(lon2 - lon1)
+        val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2)
+        val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+        return earthRadius * c
     }
 }
