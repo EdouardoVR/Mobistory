@@ -19,6 +19,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.draw.clip
+import io.ktor.client.call.receive
+import io.ktor.client.request.get
+import io.ktor.client.statement.HttpResponse
+import io.ktor.client.HttpClient
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -86,6 +90,7 @@ import androidx.compose.runtime.Composable
 class MainActivity : ComponentActivity() {
 
     private val context = this
+    private val wikipediaContentCache = mutableMapOf<String, String>()
 
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -206,6 +211,72 @@ class MainActivity : ComponentActivity() {
                     .clickable { isFullScreen = true },
                 contentScale = ContentScale.Fit
             )
+        }
+    }
+
+    fun unescapeJson(jsonString: String): String {
+        // Remplace les séquences d'échappement Unicode par le caractère correspondant
+        val unicodeCleaned = jsonString.replace(Regex("\\\\u([0-9A-Fa-f]{4})")) { matchResult ->
+            val charCode = matchResult.groupValues[1].toInt(16)
+            charCode.toChar().toString()
+        }
+        // Remplace les séquences d'échappement pour les nouvelles lignes
+        val newlineCleaned = unicodeCleaned.replace("\\n", "\n")
+        // Remplace les autres séquences d'échappement JSON standard (si nécessaire)
+        val quotesCleaned = newlineCleaned.replace("\\\"", "\"")
+
+        return quotesCleaned
+    }
+
+    fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        if(lat2 == 0.0 &&  lon2 == 0.0  ){
+            return 0.0
+        }
+        val earthRadius = 6371
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLon = Math.toRadians(lon2 - lon1)
+        val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2)
+        val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+        return earthRadius * c
+    }
+
+    suspend fun fetchWikipediaContent(pageTitle: String): String {
+        val cacheKey = pageTitle.trim().toLowerCase()
+
+        // Retourner le contenu du cache s'il existe
+        wikipediaContentCache[cacheKey]?.let { return it }
+
+        val client = HttpClient() {
+            install(JsonFeature) {
+                serializer = KotlinxSerializer(kotlinx.serialization.json.Json {
+                    ignoreUnknownKeys = true
+                })
+            }
+        }
+        val url = "https://fr.wikipedia.org/w/api.php" +
+                "?action=query" +
+                "&prop=extracts" +
+                "&exintro" +
+                "&titles=${pageTitle}" +
+                "&format=json" +
+                "&explaintext"
+
+        return try {
+            val response: HttpResponse = client.get(url)
+            val json = Json.parseToJsonElement(response.receive<String>())
+            val pages = json.jsonObject["query"]?.jsonObject?.get("pages")?.jsonObject
+            val pageContent = pages?.values?.firstOrNull()?.jsonObject?.get("extract")?.jsonPrimitive?.content ?: "Aucun contenu trouvé pour $pageTitle"
+
+            wikipediaContentCache[cacheKey] = pageContent
+
+            client.close()
+            pageContent
+        } catch (e: Exception) {
+            client.close()
+            println("Erreur lors de la récupération du contenu Wikipedia: ${e.localizedMessage}")
+            "Erreur lors de la récupération du contenu Wikipedia. Veuillez réessayer."
         }
     }
 
