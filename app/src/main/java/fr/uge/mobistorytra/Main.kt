@@ -280,4 +280,139 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    fun ShowEtiquetteDialog(
+        showDialog: Boolean,
+        onDismiss: () -> Unit,
+        text: String,
+        onTextChange: (String) -> Unit,
+        onConfirm: () -> Unit
+    ) {
+        if (showDialog) {
+            AlertDialog(
+                onDismissRequest = onDismiss,
+                title = { Text("Entrez une étiquette") },
+                text = {
+                    TextField(
+                        value = text,
+                        onValueChange = onTextChange,
+                        keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { onConfirm() })
+                    )
+                },
+                confirmButton = {
+                    Button(onClick = onConfirm) {
+                        Text("Confirmer")
+                    }
+                },
+                dismissButton = {
+                    Button(onClick = onDismiss) {
+                        Text("Annuler")
+                    }
+                }
+            )
+        }
+    }
+
+    @Composable
+    fun ExpandableEventCard(event: Event, onFavoriteClick: () -> Unit, onEtiquetteClick : (String) -> Unit) {
+        var expanded by remember { mutableStateOf(false) }
+        var wikiContent = remember { mutableStateListOf<String>().apply { addAll(List(event.claims.size) { "" }) } }
+        var showDialog by remember { mutableStateOf(false) }
+        var text by remember { mutableStateOf("") }
+        val typography = MaterialTheme.typography
+        val showWikiContent by remember { mutableStateOf(List(event.claims.size) { false }.toMutableList()) }
+        var recompositionTrigger by remember { mutableStateOf(0) }
+
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp)
+                .clickable { expanded = !expanded }
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .animateContentSize()
+            ) {
+                Text(
+                    text = extractFrenchPart(event.label),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Icon(
+                    imageVector = if (event.isFavorite == 1) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                    contentDescription = "Toggle Favorite",
+                    modifier = Modifier.clickable(onClick = onFavoriteClick)
+                )
+                Icon(
+                    imageVector = Icons.Filled.Create,
+                    contentDescription = "Toggle etiquette",
+                    modifier =  Modifier.clickable(onClick = {showDialog = true})
+                )
+                if (event.etiquette != null){
+                    Text(text = event.etiquette, fontSize = 20.sp)
+                }
+
+                ShowEtiquetteDialog(
+                    showDialog = showDialog,
+                    onDismiss = { showDialog = false },
+                    text = text,
+                    onTextChange = { text = it },
+                    onConfirm = {
+                        onEtiquetteClick(text)
+                        showDialog = false
+                        text = ""
+                    }
+                )
+
+
+
+                if (expanded) {
+
+                    Text(text = extractFrenchPart(event.description), style = typography.bodyLarge)
+                    Text(
+                        text = "Popularité: EN: ${event.popularity.en}, FR: ${event.popularity.fr}",
+                        style = typography.bodyMedium
+                    )
+                    recompositionTrigger++
+                    event.claims.forEachIndexed { index, claim ->
+                        if (removeValue(extractFrenchPart(claim.value)) != "") {
+                            Text("${extractFrenchPart(claim.verboseName)}: ${removeValue(extractFrenchPart(claim.value))}", style = typography.bodyMedium)
+                        }
+                        claim.item?.let { item ->
+                            Text("${extractFrenchPart(item.label)} - ${extractFrenchPart(item.description)}", style = typography.bodyMedium)
+                            if(item.wikipedia.isNotEmpty()){
+                                Button(onClick = {
+                                    showWikiContent[index] = !showWikiContent[index]
+                                }) {
+                                    Text(extractSpecificPart(item.wikipedia))
+                                }
+
+                            }
+
+                            if(item.wikipedia.isNotEmpty()) {
+                                LaunchedEffect(key1 = item.wikipedia) {
+                                    wikiContent[index] = fetchWikipediaContent(extractSpecificPart(item.wikipedia))
+                                }
+                            }
+
+                            if(showWikiContent[index]){
+                                Text(wikiContent[index], style = typography.bodyLarge)
+                            }
+                        }
+                    if (claim.value.startsWith("commons:")) {
+                                val imageUrl =
+                                    "https://commons.wikimedia.org/wiki/Special:FilePath/${
+                                        claim.value.removePrefix("commons:")
+                                    }"
+                                ImageFromUrl(imageUrl)
+                            }
+                        }
+                    }
+                }
+            }
+        }
 }
