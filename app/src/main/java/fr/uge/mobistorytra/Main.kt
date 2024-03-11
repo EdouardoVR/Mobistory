@@ -17,6 +17,11 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.pm.PackageManager
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.draw.clip
 import io.ktor.client.call.receive
@@ -105,6 +110,11 @@ class MainActivity : ComponentActivity() {
             processJsonFile("events.txt", context, dbHelper)
         }
         val viewModel = ViewModelProvider(this, ViewModelFactory(dbHelper))[ItemsViewModel::class.java]
+        setContent {
+            Column {
+                EventListScreen(viewModel)
+            }
+        }
     }
 
     enum class DisplayMode {
@@ -415,4 +425,112 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+
+    fun sendEventNotification(context: Context, event: Event) {
+        val notificationId = 1 // Définissez un identifiant unique pour cette notification
+        val channelId = "event_notification_channel" // Identifiant du canal de notification
+
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val name = "Événement du jour"
+            val descriptionText = "Notifications pour l'événement du jour"
+            val importance = NotificationManager.IMPORTANCE_DEFAULT
+            val channel = NotificationChannel(channelId, name, importance).apply {
+                description = descriptionText
+            }
+            val notificationManager: NotificationManager =
+                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val notificationBuilder = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(R.drawable.icon)
+            .setContentTitle("Événement du jour")
+            .setContentText(event.label)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+
+        with(NotificationManagerCompat.from(context)) {
+            if (ActivityCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                return
+            }
+            notify(notificationId, notificationBuilder.build())
+        }
+    }
+
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    fun EventListScreen(viewModel: ItemsViewModel) {
+        val events by viewModel.items.observeAsState(initial = emptyList())
+        var searchText by remember { mutableStateOf("") }
+        var showFrise by remember { mutableStateOf(false) } // Contrôle l'affichage de la frise
+        var showQuiz by remember { mutableStateOf(false) } // Contrôle l'affichage du quiz
+        var showEvents by remember { mutableStateOf(true) } // Contrôle l'affichage des cartes d'événements
+        var display by remember {
+            mutableStateOf(DisplayMode.Temporal)
+        }
+        var score by remember { mutableStateOf<Int?>(null) } // Pour stocker le score après le quiz
+
+        findEventsByDate(events)?.let { if(it == null) Text(text = "pas d'evenement du jour") else sendEventNotification(this, it) }
+
+
+        var latitude by remember { mutableStateOf(0.0) }
+        var longitude by remember { mutableStateOf(0.0) }
+
+
+        Column {
+            SortDropdownMenu(selectedOption = display, onOptionSelected = { option ->
+                display = option
+                viewModel.sortEvents(option, latitude, longitude)
+            })
+
+            Row {
+                Button(onClick = {
+                    showFrise = !showFrise
+                    showQuiz = false
+                    showEvents = !showFrise
+                }) {
+                    Text(text = if (showFrise) "Cacher Frise" else "Afficher Frise")
+                }
+                Spacer(Modifier.width(8.dp))
+                Button(onClick = {
+                    showQuiz = !showQuiz
+                    showFrise = false
+                    showEvents = !showQuiz
+                }) {
+                    Text(text = if (showQuiz) "Cacher Quiz" else "Afficher Quiz")
+                }
+            }
+
+            if (showEvents) {
+                TextField(
+                    value = searchText,
+                    onValueChange = { newText ->
+                        searchText = newText
+                        viewModel.searchEvents(newText)
+                    },
+                    label = { Text("Recherche") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                LazyColumn {
+                    items(events) { event ->
+                        ExpandableEventCard(
+                            event = event,
+                            onFavoriteClick = { viewModel.toggleFavorite(event.id);
+                            }, onEtiquetteClick ={
+                                text ->
+                                println(text)
+                                viewModel.toggleEtiquette(event.id, text)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
