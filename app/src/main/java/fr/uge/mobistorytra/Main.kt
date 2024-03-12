@@ -506,7 +506,14 @@ class MainActivity : ComponentActivity() {
                     Text(text = if (showQuiz) "Cacher Quiz" else "Afficher Quiz")
                 }
             }
+            if (showQuiz) {
+                Text("Resulat au Quizz précedent : $score")
 
+                QuizScreen(events) { finalScore ->
+                    score = finalScore
+                    showQuiz = false
+                }
+            }
             if (showEvents) {
                 TextField(
                     value = searchText,
@@ -529,6 +536,91 @@ class MainActivity : ComponentActivity() {
                             }
                         )
                     }
+                }
+            }
+        }
+    }
+
+    fun getRandomEvents(events: List<Event>, count: Int = 4): List<Event> {
+        return events.shuffled().take(count)
+    }
+
+
+    fun isCorrectOrder(events: List<Event>): Boolean {
+        return events.zipWithNext { a, b -> a.date?.year!! <= b.date?.year!! }.all { it }
+    }
+
+
+    @Composable
+    fun QuizScreen(events: List<Event>, onFinishQuiz: (Int) -> Unit) {
+        val maxRounds = 5
+        var currentRound by remember { mutableStateOf(1) }
+        var score by remember { mutableStateOf(0) }
+        val quizEvents = remember { getRandomEvents(events).toMutableList() }
+        var result by remember { mutableStateOf<String?>(null) }
+        var selectedIndex by remember { mutableStateOf(-1) }
+
+        if (currentRound <= maxRounds) {
+            Column(modifier = Modifier.padding(16.dp).fillMaxHeight()) {
+                Text("Manche $currentRound sur $maxRounds", style = MaterialTheme.typography.bodyMedium)
+                Text("Ordonnez ces événements par date croissante :", style = MaterialTheme.typography.bodyMedium)
+
+                LazyColumn(modifier = Modifier.weight(1f).padding(top = 8.dp)) {
+                    itemsIndexed(quizEvents) { index, event ->
+                        val isSelected = index == selectedIndex
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                                .border(
+                                    width = 2.dp,
+                                    color = if (isSelected) Color.Red else Color.Transparent,
+                                    shape = RoundedCornerShape(4.dp)
+                                )
+                                .clickable {
+                                    if (selectedIndex == -1) {
+                                        selectedIndex = index
+                                    } else if (selectedIndex == index) {
+                                        selectedIndex = -1
+                                    } else {
+                                        // Échanger les événements sélectionnés
+                                        Collections.swap(quizEvents, selectedIndex, index)
+                                        selectedIndex = -1
+                                        result = null
+                                    }
+                                }
+                        ) {
+                            Text(
+                                "${index + 1}. ${extractFrenchPart(event.label)} (${event.date?.year})",
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(8.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(onClick = {
+                    result = if (isCorrectOrder(quizEvents)) {
+                        score++
+                        "Correct !"
+                    } else {
+                        "Incorrect"
+                    }
+
+                    if (currentRound < maxRounds) {
+                        currentRound++
+                        quizEvents.clear()
+                        quizEvents.addAll(getRandomEvents(events))
+                        selectedIndex = -1
+                        result = null
+                    } else {
+                        currentRound = 0
+                        onFinishQuiz(score)
+                    }
+                }) {
+                    Text("Soumettre")
                 }
             }
         }
