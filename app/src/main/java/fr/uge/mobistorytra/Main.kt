@@ -91,11 +91,42 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.PermissionStatus
+import com.google.accompanist.permissions.rememberPermissionState
 
 class MainActivity : ComponentActivity() {
 
     private val context = this
     private val wikipediaContentCache = mutableMapOf<String, String>()
+
+    @OptIn(ExperimentalPermissionsApi::class)
+    @Composable
+    fun LocationPermissionFeature() {
+        val fineLocationPermissionState = rememberPermissionState(permission = Manifest.permission.ACCESS_FINE_LOCATION)
+
+        when (fineLocationPermissionState.status) {
+            is PermissionStatus.Granted -> {
+                Text("Permission de localisation accordée. Vous pouvez utiliser la localisation ici.")
+            }
+            is PermissionStatus.Denied -> {
+                val shouldShowRationale = (fineLocationPermissionState.status as PermissionStatus.Denied).shouldShowRationale
+                if (shouldShowRationale) {
+                    Button(onClick = { fineLocationPermissionState.launchPermissionRequest() }) {
+                        Text("Demander la permission de localisation")
+                    }
+                } else {
+                    Button(onClick = { fineLocationPermissionState.launchPermissionRequest() }) {
+                        Text("Demander la permission de localisation")
+                    }
+                }
+            }
+        }
+        return
+    }
 
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -112,6 +143,7 @@ class MainActivity : ComponentActivity() {
         val viewModel = ViewModelProvider(this, ViewModelFactory(dbHelper))[ItemsViewModel::class.java]
         setContent {
             Column {
+                LocationPermissionFeature()
                 EventListScreen(viewModel)
             }
         }
