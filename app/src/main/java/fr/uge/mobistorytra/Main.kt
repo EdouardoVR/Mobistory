@@ -128,6 +128,21 @@ class MainActivity : ComponentActivity() {
         return
     }
 
+    fun obtainLocation(context: Context) {
+        val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+    }
+
+    /*fun checkFirstRunAndProcessFile(context: Context, dbHelper: EventsDatabaseHelper) {
+        val prefs = context.getSharedPreferences("MyAppPrefs", Context.MODE_PRIVATE)
+        val isFirstRun = prefs.getBoolean("isFirstRun20", true)
+
+        if (isFirstRun) {
+            processJsonFile("events.txt", context, dbHelper)
+
+            prefs.edit().putBoolean("isFirstRun20", false).apply()
+        }
+    }*/
+
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -514,6 +529,9 @@ class MainActivity : ComponentActivity() {
         var latitude by remember { mutableStateOf(0.0) }
         var longitude by remember { mutableStateOf(0.0) }
 
+        DisposableEffect(Unit) {
+            obtainLocation(context)
+        }
 
         Column {
             SortDropdownMenu(selectedOption = display, onOptionSelected = { option ->
