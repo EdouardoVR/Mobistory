@@ -538,6 +538,9 @@ class MainActivity : ComponentActivity() {
                     Text(text = if (showQuiz) "Cacher Quiz" else "Afficher Quiz")
                 }
             }
+            if (showFrise) {
+                Frise(eventsList =  events, displayMode = display, latitude, longitude)
+            }
             if (showQuiz) {
                 Text("Resulat au Quizz précedent : $score")
 
@@ -653,6 +656,105 @@ class MainActivity : ComponentActivity() {
                     }
                 }) {
                     Text("Soumettre")
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun Frise(eventsList: List<Event>, displayMode: DisplayMode, latitude: Double, longitude: Double, modifier: Modifier = Modifier) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            LazyRow(modifier = modifier) {
+                when (displayMode) {
+                    DisplayMode.Temporal -> {
+                        val startYear = -200
+                        val endYear = 2022
+                        val totalYears = endYear - startYear
+                        items(totalYears + 1) { index ->
+                            val year = startYear + index
+                            Column() {
+                                val relevantEvents = eventsList.filter { it.date?.year == year }
+                                Box(
+                                    modifier = Modifier
+                                        .height(200.dp)
+                                        .width(if (relevantEvents.isNotEmpty() || year % 100 == 0) 100.dp else 5.dp)
+                                        .background(Color.Blue),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (year % 100 == 0 || relevantEvents.isNotEmpty()) {
+                                        Text(text = year.toString(), fontSize = 10.sp, color = Color.White)
+                                    }
+                                }
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                ) {
+                                    items(relevantEvents) { event ->
+                                        event.date?.let { println(it.year) }
+                                        Box(
+                                            modifier = Modifier
+                                                .size(100.dp)
+                                                .background(Color.Gray)
+                                                .padding(4.dp), // Ajoute un peu d'espace entre les éléments
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = extractSpecificPart(event.label),
+                                                color = Color.White,
+                                                fontSize = 12.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    DisplayMode.Geo -> {
+                        val eventsByDistance = eventsList.mapNotNull { event ->
+                            event.geo?.let { geo ->
+                                val distance = calculateDistance(latitude, longitude, geo.latitude, geo.longitude)
+                                distance to event
+                            }
+                        }.sortedBy { it.first }
+
+                        items(eventsByDistance) { (distance, event) ->
+                            if (distance != 0.0) {
+                                Column(modifier = Modifier.padding(4.dp)) {
+                                    Text(
+                                        "Distance: ${"%.1f".format(distance/1000)} km",
+                                        fontSize = 10.sp,
+                                        color = Color.Black
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(100.dp)
+                                            .background(Color.Gray)
+                                            .padding(4.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = extractSpecificPart(event.label),
+                                            color = Color.White,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else -> {
+                        items(eventsList) { event ->
+                            Box(
+                                modifier = Modifier
+                                    .padding(4.dp)
+                                    .size(100.dp)
+                                    .background(Color.LightGray),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(extractFrenchPart(event.label), color = Color.White, fontSize = 12.sp)
+                            }
+                        }
+                    }
                 }
             }
         }
