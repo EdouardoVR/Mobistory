@@ -69,40 +69,7 @@ class ItemsViewModel(private val dbHelper: EventsDatabaseHelper) : ViewModel() {
     }
 
 
-    /*@RequiresApi(Build.VERSION_CODES.O)
-    fun adjustAndParseDate(dateStr: String): LocalDate {
-        val adjustedDateStr = dateStr.split("-").mapIndexed { index, value ->
-            if (index > 0 && value == "0") "1" else value
-        }.joinToString("-")
 
-        val formatter = DateTimeFormatterBuilder()
-            .appendValue(ChronoField.YEAR, 1, 10, SignStyle.NORMAL)
-            .appendLiteral('-')
-            .appendValue(ChronoField.MONTH_OF_YEAR, 1, 2, SignStyle.NORMAL)
-            .appendLiteral('-')
-            .appendValue(ChronoField.DAY_OF_MONTH, 1, 2, SignStyle.NORMAL)
-            .toFormatter()
-        return LocalDate.parse(adjustedDateStr, formatter)
-    }*/
-
-
-    /*@RequiresApi(Build.VERSION_CODES.O)
-    fun sortEvents(sortOption: MainActivity.DisplayMode) {
-        val eventDateMap = extractEventDates()
-
-        val sortedList = items.value?.sortedWith(compareByDescending<Event> { it.isFavorite }
-            .thenBy {
-                when (sortOption) {
-                    MainActivity.DisplayMode.Populaire -> it.popularity.en
-                    MainActivity.DisplayMode.Alphabetical -> if(it.label == "") "Z" else it.label.substringAfter("fr:").substringBefore("||en:").trim()
-                    MainActivity.DisplayMode.Temporal -> eventDateMap[it.id]?.let { dateStr ->
-                        adjustAndParseDate(dateStr)
-                    } ?: LocalDate.MAX
-                    else -> it.label
-                }
-            })
-        _items.postValue(sortedList ?: emptyList())
-    }*/
 
     @RequiresApi(Build.VERSION_CODES.O)
     fun sortEvents(
@@ -113,7 +80,21 @@ class ItemsViewModel(private val dbHelper: EventsDatabaseHelper) : ViewModel() {
         val sortedList = items.value?.sortedWith(compareByDescending<Event> { it.isFavorite }
             .thenBy {
                 when (sortOption) {
-                    MainActivity.DisplayMode.Populaire -> it.popularity.en
+                    MainActivity.DisplayMode.Populaire -> {
+                        if (it.popularity.en == 0 && it.popularity.fr == 0) {
+                            // Les deux popularités sont à 0, ces éléments vont à la fin.
+                            Int.MAX_VALUE
+                        } else if (it.popularity.en == 0) {
+                            // Seulement la popularité en anglais est à 0, utilisez la popularité en français.
+                            it.popularity.fr
+                        } else if (it.popularity.fr == 0) {
+                            // Seulement la popularité en français est à 0, utilisez la popularité en anglais.
+                            it.popularity.en
+                        } else {
+                            // Aucune des popularités est à 0, utilisez la plus grande des deux.
+                            minOf(it.popularity.en, it.popularity.fr)
+                        }
+                    }
                     MainActivity.DisplayMode.Alphabetical -> if (it.label == "") "Z" else it.label.substringAfter(
                         "fr:"
                     ).substringBefore("||en:").trim()
@@ -126,8 +107,8 @@ class ItemsViewModel(private val dbHelper: EventsDatabaseHelper) : ViewModel() {
                             )
                         }
                     }
-
-                    else -> it.label
+                    MainActivity.DisplayMode.Etiquette -> it.etiquette ?: "\uFFFF"
+                    else -> "\uFFFF"
                 }
             })
         _items.postValue(sortedList ?: emptyList())
@@ -202,3 +183,4 @@ class ItemsViewModel(private val dbHelper: EventsDatabaseHelper) : ViewModel() {
         return yearString?.toIntOrNull()
     }
 }
+

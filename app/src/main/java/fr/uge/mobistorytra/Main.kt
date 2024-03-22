@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.PackageManager
+import android.content.res.Resources.Theme
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
@@ -65,6 +66,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -212,6 +215,7 @@ class MainActivity : ComponentActivity() {
             downloader.downloadAndDecompressFile()
             processJsonFile("events.txt", context, dbHelper)
         }
+        println("ici")
         val viewModel =
             ViewModelProvider(this, ViewModelFactory(dbHelper))[ItemsViewModel::class.java]
         setContent {
@@ -226,7 +230,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun SortDropdownMenu(selectedOption: DisplayMode, onOptionSelected: (DisplayMode) -> Unit) {
         var expanded by remember { mutableStateOf(false) }
-        val options = listOf<DisplayMode>(DisplayMode.Populaire, DisplayMode.Temporal, DisplayMode.Alphabetical, DisplayMode.Geo)
+        val options = listOf<DisplayMode>(DisplayMode.Populaire, DisplayMode.Temporal, DisplayMode.Alphabetical, DisplayMode.Geo, DisplayMode.Etiquette)
 
         Box(Modifier.wrapContentSize(Alignment.TopStart)) {
             Text(
@@ -364,6 +368,7 @@ class MainActivity : ComponentActivity() {
         Temporal,
         Populaire,
         Geo,
+        Etiquette,
     }
 
 
@@ -500,11 +505,15 @@ class MainActivity : ComponentActivity() {
         var selectedIndex by remember { mutableStateOf(-1) }
 
         if (currentRound <= maxRounds) {
-            Column(modifier = Modifier.padding(16.dp).fillMaxHeight()) {
+            Column(modifier = Modifier
+                .padding(16.dp)
+                .fillMaxHeight()) {
                 Text("Manche $currentRound sur $maxRounds", style = MaterialTheme.typography.bodyMedium)
                 Text("Ordonnez ces événements par date croissante :", style = MaterialTheme.typography.bodyMedium)
 
-                LazyColumn(modifier = Modifier.weight(1f).padding(top = 8.dp)) {
+                LazyColumn(modifier = Modifier
+                    .weight(1f)
+                    .padding(top = 8.dp)) {
                     itemsIndexed(quizEvents) { index, event ->
                         val isSelected = index == selectedIndex
                         Row(
@@ -754,6 +763,9 @@ class MainActivity : ComponentActivity() {
                         style = typography.bodyMedium
                     )
                     recompositionTrigger++
+                    event.geo?.let { println(it.latitude) }
+                    event.geo?.let { println(it.longitude) }
+
                     event.claims.forEachIndexed { index, claim ->
                         if (removeValue(extractFrenchPart(claim.value)) != "") {
                             Text("${extractFrenchPart(claim.verboseName)}: ${removeValue(extractFrenchPart(claim.value))}", style = typography.bodyMedium)
@@ -761,23 +773,32 @@ class MainActivity : ComponentActivity() {
                         claim.item?.let { item ->
                             Text("${extractFrenchPart(item.label)} - ${extractFrenchPart(item.description)}", style = typography.bodyMedium)
                             if(item.wikipedia.isNotEmpty()){
+                                Spacer(Modifier.width(15.dp))
                                 Button(onClick = {
                                     showWikiContent[index] = !showWikiContent[index]
-                                }) {
+                                },
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .border(5.dp, Color.Black, RectangleShape)) {
                                     Text(extractSpecificPart(item.wikipedia))
                                 }
+                                Spacer(Modifier.width(15.dp))
+
 
                             }
-
-                            if(item.wikipedia.isNotEmpty()) {
+                            if (index >= 0 && index < showWikiContent.size && index < wikiContent.size) {
+                                if(item.wikipedia.isNotEmpty()) {
                                 LaunchedEffect(key1 = item.wikipedia) {
                                     wikiContent[index] = fetchWikipediaContent(extractSpecificPart(item.wikipedia))
                                 }
                             }
 
-                            if(showWikiContent[index]){
-                                Text(wikiContent[index], style = typography.bodyLarge)
+                                if (showWikiContent[index]) {
+                                    Text(wikiContent[index], style = typography.bodyLarge)
+                                }
+                            } else {
                             }
+
                         }
                     if (claim.value.startsWith("commons:")) {
                                 val imageUrl =
@@ -830,3 +851,4 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+

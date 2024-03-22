@@ -19,7 +19,13 @@ data class Event(
     val geo : Geo? = null,
     val isFavorite: Int = 0,
     val etiquette: String? = null
+)
 
+data class Claim(
+    val id : Int,
+    val verboseName: String,
+    val value: String,
+    val item: Item?
 )
 
 data class Date(
@@ -40,12 +46,7 @@ data class Popularity(
     val fr: Int
 )
 
-data class Claim(
-    val id : Int,
-    val verboseName: String,
-    val value: String,
-    val item: Item?
-)
+
 
 data class Item(
     val label: String,
@@ -119,3 +120,10 @@ fun parseItem(jsonObject: JsonObject): Item {
         wikipedia = jsonObject["wikipedia"]?.asString ?: "",
     )
 }
+
+
+
+
+
+
+
