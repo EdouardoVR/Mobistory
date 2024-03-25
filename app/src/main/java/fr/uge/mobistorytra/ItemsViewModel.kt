@@ -20,6 +20,13 @@ class ItemsViewModel(private val dbHelper: EventsDatabaseHelper) : ViewModel() {
     val items: LiveData<List<Event>> = _items
     private var itemList = dbHelper.getAllItems()
 
+    private val _eventoftheDay = MutableLiveData<Event>()
+    val eventoftheDay: LiveData<Event> = _eventoftheDay
+
+    fun updateEvent(newEvent: Event) {
+        _eventoftheDay.value = newEvent
+    }
+
     init {
         loadItems()
     }

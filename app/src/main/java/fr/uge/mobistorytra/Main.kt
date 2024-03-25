@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Image
@@ -36,6 +37,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -70,6 +72,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -100,12 +103,15 @@ import kotlin.concurrent.thread
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus
 import com.google.accompanist.permissions.rememberPermissionState
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 
 class MainActivity : ComponentActivity() {
 
     private val wikipediaContentCache = mutableMapOf<String, String>()
     private val context = this
+    private var eventoftheday: Event? = null
 
     @OptIn(ExperimentalPermissionsApi::class)
     @Composable
@@ -166,9 +172,30 @@ class MainActivity : ComponentActivity() {
         }
     }*/
 
+    fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), CONTEXT_INCLUDE_CODE)
+            }
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == CONTEXT_INCLUDE_CODE) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                eventoftheday?.let { sendEventNotification(context, it) }
+            } else {
+
+            }
+        }
+    }
+
+
+
     fun sendEventNotification(context: Context, event: Event) {
-        val notificationId = 1 // Définissez un identifiant unique pour cette notification
-        val channelId = "event_notification_channel" // Identifiant du canal de notification
+        val notificationId = 1
+        val channelId = "event_notification_channel"
 
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -186,7 +213,7 @@ class MainActivity : ComponentActivity() {
         val notificationBuilder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.icon)
             .setContentTitle("Événement du jour")
-            .setContentText(event.label)
+            .setContentText(extractSpecificPart(event.label))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
 
         with(NotificationManagerCompat.from(context)) {
@@ -218,6 +245,8 @@ class MainActivity : ComponentActivity() {
         println("ici")
         val viewModel =
             ViewModelProvider(this, ViewModelFactory(dbHelper))[ItemsViewModel::class.java]
+
+
         setContent {
                 Column {
                     LocationPermissionFeature()
@@ -253,13 +282,13 @@ class MainActivity : ComponentActivity() {
 
 
     @RequiresApi(Build.VERSION_CODES.O)
-    fun findEventsByDate(events: List<Event>): Event? {
+    fun findEventsByDate(events: List<Event>, viewModel: ItemsViewModel): Event? {
         val today = LocalDate.now()
         val month = today.monthValue
         val dayOfMonth = today.dayOfMonth
         for (event in events.shuffled()){
             if(event.date?.month == month && event.date.day == dayOfMonth){
-                return event
+                eventoftheday = event
             }
         }
         return null
@@ -280,7 +309,9 @@ class MainActivity : ComponentActivity() {
         }
         var score by remember { mutableStateOf<Int?>(null) } // Pour stocker le score après le quiz
 
-        findEventsByDate(events)?.let { if(it == null) Text(text = "pas d'evenement du jour") else sendEventNotification(this, it) }
+        findEventsByDate(events, viewModel)
+        requestNotificationPermission()
+
 
 
         var latitude by remember { mutableStateOf(0.0) }
@@ -373,7 +404,51 @@ class MainActivity : ComponentActivity() {
 
 
     @Composable
+    fun DisplayEvent(event: Event) {
+        Column {
+            Text(text = "ID: ${event.id}", fontSize = 20.sp)
+            Text(text = "Label: ${event.label}", fontSize = 20.sp)
+            Text(text = "Aliases: ${event.aliases}", fontSize = 20.sp)
+            Text(text = "Description: ${event.description}", fontSize = 20.sp)
+            Text(text = "Popularity Score: ${event.popularity.en}", fontSize = 20.sp)
+            event.date?.let {
+                Text(text = "Date: ${it.year}/${it.month}/${it.day}", fontSize = 20.sp)
+            }
+            event.geo?.let {
+                Text(text = "Location: Lat ${it.latitude}, Long ${it.longitude}", fontSize = 20.sp)
+            }
+            Text(text = "Is Favorite: ${if (event.isFavorite > 0) "Yes" else "No"}", fontSize = 20.sp)
+            event.etiquette?.let {
+                Text(text = "Etiquette: $it", fontSize = 20.sp)
+            }
+            event.claims.forEach { claim ->
+                Text(text = "Claim ${claim.id}: ${claim.value}", fontSize = 18.sp, color = Color.Gray)
+            }
+        }
+    }
+
+    @Composable
+    fun EventDialog(event: Event, onDismiss: () -> Unit) {
+        Dialog(onDismissRequest = onDismiss) {
+            Box(
+                modifier = Modifier
+                    .background(Color.White)
+                    .padding(16.dp)
+            ) {
+                Column {
+                    DisplayEvent(event = event)
+                    Button(onClick = onDismiss) {
+                        Text("Close")
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
     fun Frise(eventsList: List<Event>, displayMode: DisplayMode, latitude: Double, longitude: Double, modifier: Modifier = Modifier) {
+        var showDialogId by remember { mutableStateOf<Int?>(null) }
+
         Box(modifier = Modifier.fillMaxSize()) {
             LazyRow(modifier = modifier) {
                 when (displayMode) {
@@ -406,7 +481,8 @@ class MainActivity : ComponentActivity() {
                                             modifier = Modifier
                                                 .size(100.dp)
                                                 .background(Color.Gray)
-                                                .padding(4.dp), // Ajoute un peu d'espace entre les éléments
+                                                .padding(4.dp).clickable {showDialogId = event.id
+                                                },
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text(
@@ -415,8 +491,14 @@ class MainActivity : ComponentActivity() {
                                                 fontSize = 12.sp
                                             )
                                         }
+                                        if (showDialogId == event.id) {
+                                            EventDialog(event = event, onDismiss = {
+                                                showDialogId = null
+                                            })
+                                        }
                                     }
                                 }
+
                             }
                         }
                     }
